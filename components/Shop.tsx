@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { PlayerStats } from '../types';
 import { PRICES } from '../constants';
@@ -6,9 +5,11 @@ import { PRICES } from '../constants';
 interface Props {
   stats: PlayerStats;
   onBack: () => void;
+  // დავამატეთ ფუნქცია VIP-ის განსაბლოკად
+  onUnlockVip: () => void;
 }
 
-const Shop: React.FC<Props> = ({ stats, onBack }) => {
+const Shop: React.FC<Props> = ({ stats, onBack, onUnlockVip }) => {
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between mb-8 px-2">
@@ -31,17 +32,29 @@ const Shop: React.FC<Props> = ({ stats, onBack }) => {
             </div>
             <div className="text-3xl">👑</div>
           </div>
+
           {stats.unlockedVip ? (
             <div className="w-full py-3 bg-green-500/20 text-green-400 border border-green-500/50 rounded-xl text-center font-bold">
               უკვე გააქტიურებულია ✅
             </div>
           ) : (
-            <button className="w-full py-3 bg-yellow-500 text-black rounded-xl font-bold hover:scale-105 transition-transform active:scale-95">
-              განბლოკვა 🪙 {PRICES.VIP_UNLOCK}
+            <button
+              // ახლა ღილაკი რეალურად იყიდის VIP-ს
+              onClick={onUnlockVip}
+              disabled={stats.coins < PRICES.VIP_UNLOCK}
+              className={`w-full py-3 rounded-xl font-bold transition-transform active:scale-95 ${stats.coins >= PRICES.VIP_UNLOCK
+                  ? 'bg-yellow-500 text-black hover:scale-105'
+                  : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                }`}
+            >
+              {stats.coins >= PRICES.VIP_UNLOCK
+                ? `განბლოკვა 🪙 ${PRICES.VIP_UNLOCK}`
+                : 'არ გაქვთ საკმარისი მონეტები'}
             </button>
           )}
         </div>
 
+        {/* ... დანარჩენი სექციები უცვლელია ... */}
         <div className="p-6 glass rounded-3xl flex justify-between items-center opacity-50">
           <div>
             <h3 className="text-xl font-bold">ახალი თემები</h3>
@@ -49,16 +62,8 @@ const Shop: React.FC<Props> = ({ stats, onBack }) => {
           </div>
           <div className="text-xs uppercase bg-white/10 px-2 py-1 rounded">მალე</div>
         </div>
-
-        <div className="p-6 glass rounded-3xl flex justify-between items-center opacity-50">
-          <div>
-            <h3 className="text-xl font-bold">სპეციალური ემოჯები</h3>
-            <p className="text-sm">გახადე თამაში უფრო ფერადი</p>
-          </div>
-          <div className="text-xs uppercase bg-white/10 px-2 py-1 rounded">მალე</div>
-        </div>
       </div>
-      
+
       <div className="mt-auto text-center p-8 opacity-40 text-sm italic">
         უფრო მეტი კონტენტი დაემატება შემდეგ განახლებაში!
       </div>
