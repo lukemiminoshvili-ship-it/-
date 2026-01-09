@@ -13,7 +13,6 @@ interface Props {
 }
 
 const GameScreen: React.FC<Props> = ({ tour, roundIndex, onWin, onBack, coins, onDeductCoins, lang }) => {
-  // დაცვა: თუ რაუნდი არ არსებობს, არ გაითიშოს
   const round = tour.rounds[roundIndex];
 
   const [inputs, setInputs] = useState<string[]>([]);
@@ -21,18 +20,18 @@ const GameScreen: React.FC<Props> = ({ tour, roundIndex, onWin, onBack, coins, o
   const [revealedIndices, setRevealedIndices] = useState<number[]>([]);
   const [shakeTrigger, setShakeTrigger] = useState(false);
   const [isShifted, setIsShifted] = useState(false);
-  const [isTouchDevice, setIsTouchDevice] = useState(false);
 
   const emojiMapRef = useRef<string[]>([]);
 
-  // მონაცემების მომზადება
+  // მონაცემების მომზადება და ემოჯების გენერაცია
   useEffect(() => {
     if (!round) return;
 
-    setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0);
     const answerChars = round.answer.split('');
     const inputCount = answerChars.filter(c => c !== ' ').length;
-    const emojiPool = lang === 'ka' ? EMOJI_POOL_KA : EMOJI_POOL_EN;
+
+    // ვირჩევთ აუზს ენის მიხედვით
+    const currentEmojiPool = lang === 'ka' ? EMOJI_POOL_KA : EMOJI_POOL_EN;
 
     setInputs(new Array(inputCount).fill(''));
     setHintUsed(false);
@@ -41,10 +40,17 @@ const GameScreen: React.FC<Props> = ({ tour, roundIndex, onWin, onBack, coins, o
 
     emojiMapRef.current = answerChars.map(char => {
       if (char === ' ') return ' ';
+
       const lower = char.toLowerCase();
-      const pool = emojiPool[lower as keyof typeof emojiPool];
+      const pool = currentEmojiPool[lower as keyof typeof currentEmojiPool];
+
+      // 40% შანსი რომ ჩანაცვლდეს ემოჯით
       const shouldEmoji = Math.random() > 0.4;
-      return shouldEmoji && pool ? pool[Math.floor(Math.random() * pool.length)] : char;
+
+      if (shouldEmoji && pool && pool.length > 0) {
+        return pool[Math.floor(Math.random() * pool.length)];
+      }
+      return char;
     });
   }, [roundIndex, round, lang]);
 
@@ -62,8 +68,8 @@ const GameScreen: React.FC<Props> = ({ tour, roundIndex, onWin, onBack, coins, o
       if (isFull) {
         let inputIdx = 0;
         const formedAnswer = answerChars.map(c => (c === ' ' ? ' ' : newInputs[inputIdx++])).join('');
+
         if (formedAnswer.toLowerCase() === round.answer.toLowerCase()) {
-          // აქ გასწორდა includes-ის შეცდომა String-ით
           const reward = String(tour.id).includes('vip') ? 100 : 25;
           setTimeout(() => onWin(reward), 300);
         } else {
@@ -86,6 +92,7 @@ const GameScreen: React.FC<Props> = ({ tour, roundIndex, onWin, onBack, coins, o
     });
   }, []);
 
+  // ფიზიკური კლავიატურის მხარდაჭერა
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Backspace') handleBackspace();
@@ -109,14 +116,14 @@ const GameScreen: React.FC<Props> = ({ tour, roundIndex, onWin, onBack, coins, o
   let inputCounter = 0;
 
   const renderKey = (char: string) => {
-    const displayChar = isShifted && GEORGIAN_KEYBOARD_MAP[char as keyof typeof GEORGIAN_KEYBOARD_MAP]
-      ? GEORGIAN_KEYBOARD_MAP[char as keyof typeof GEORGIAN_KEYBOARD_MAP]
+    const displayChar = isShifted && GEORGIAN_KEYBOARD_MAP[char]
+      ? GEORGIAN_KEYBOARD_MAP[char]
       : char;
     return (
       <button
         key={char}
         onClick={() => handleKeyPress(displayChar)}
-        className="flex-1 min-w-[24px] h-9 md:h-11 bg-white/10 hover:bg-white/30 active:scale-90 rounded-lg font-bold text-sm md:text-lg text-white border-b-2 border-black/30 shadow transition-colors"
+        className="flex-1 min-w-[28px] h-10 md:h-12 bg-white/10 hover:bg-white/20 active:scale-90 rounded-xl font-bold text-white border-b-2 border-black/20 transition-all"
       >
         {displayChar}
       </button>
@@ -124,40 +131,44 @@ const GameScreen: React.FC<Props> = ({ tour, roundIndex, onWin, onBack, coins, o
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#d000ff] p-2 md:p-8 overflow-hidden">
-      <div className="flex items-center justify-between mb-4">
-        <button onClick={onBack} className="p-3 bg-white/15 rounded-2xl hover:bg-white/25 text-white font-bold transition-all active:scale-90">⬅</button>
-        <div className="bg-white/10 px-6 py-2 rounded-2xl text-center border border-white/10 backdrop-blur-md">
+    <div className="flex flex-col h-full bg-[#d000ff] p-4 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <button onClick={onBack} className="p-3 bg-white/10 rounded-2xl text-white active:scale-90 transition-all">⬅</button>
+        <div className="text-center">
           <div className="text-[10px] text-white/50 font-black uppercase tracking-widest">{tour.name}</div>
-          <div className="text-sm font-black text-white">{isKa ? 'რაუნდი' : 'Round'} {roundIndex + 1}/{tour.rounds.length}</div>
+          <div className="text-white font-black">{isKa ? 'რაუნდი' : 'Round'} {roundIndex + 1}/{tour.rounds.length}</div>
         </div>
-        <div className="bg-yellow-400 text-black px-4 py-1.5 rounded-2xl flex items-center gap-1.5 shadow-xl border-b-2 border-yellow-700">
-          <span className="font-black text-lg">{coins} 🪙</span>
+        <div className="bg-yellow-400 text-black px-4 py-1.5 rounded-2xl font-black shadow-lg">
+          {coins} 🪙
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center space-y-6 md:space-y-10 overflow-hidden min-h-0">
-        <h2 className="text-xl md:text-3xl font-black text-white drop-shadow-2xl text-center">
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col items-center justify-center space-y-8 min-h-0">
+        <h2 className="text-2xl font-black text-white text-center">
           {isKa ? 'გამოიცანი სიტყვა ❤️' : 'Guess the Word ❤️'}
         </h2>
 
-        <div className={`flex flex-wrap justify-center gap-2 md:gap-4 transition-all duration-300 ${shakeTrigger ? 'animate-shake' : ''}`}>
+        {/* Emoji Display */}
+        <div className={`flex flex-wrap justify-center gap-3 transition-all ${shakeTrigger ? 'animate-shake' : ''}`}>
           {emojiMapRef.current.map((charOrEmoji, i) => {
-            if (charOrEmoji === ' ') return <div key={i} className="w-4 md:w-8" />;
+            if (charOrEmoji === ' ') return <div key={i} className="w-6" />;
             const isRevealed = revealedIndices.includes(i);
             const isEmoji = charOrEmoji.length > 1 || /\p{Emoji}/u.test(charOrEmoji);
+
             return (
               <div
                 key={i}
                 onClick={() => isEmoji && !isRevealed && onDeductCoins(PRICES.REVEAL_LETTER) && setRevealedIndices(p => [...p, i])}
-                className={`group relative p-3 md:p-5 rounded-2xl md:rounded-3xl border border-white/20 backdrop-blur-xl shadow-2xl transition-all ${isEmoji && !isRevealed ? 'cursor-pointer hover:scale-110 active:scale-95 bg-white/20' : 'bg-white/10'
-                  } ${isRevealed ? 'bg-green-500/40 border-green-400' : ''}`}
+                className={`relative w-16 h-16 md:w-24 md:h-24 flex items-center justify-center rounded-3xl border border-white/20 backdrop-blur-md shadow-2xl transition-all ${isEmoji && !isRevealed ? 'cursor-pointer hover:scale-110 bg-white/20' : 'bg-white/5'
+                  } ${isRevealed ? 'bg-green-500/30 border-green-400' : ''}`}
               >
                 <span className="text-4xl md:text-6xl select-none">
                   {isRevealed ? answerChars[i] : charOrEmoji}
                 </span>
                 {isEmoji && !isRevealed && (
-                  <div className="absolute -top-2 -right-2 bg-yellow-400 text-[9px] px-1.5 py-0.5 rounded-full font-black text-black shadow-lg">
+                  <div className="absolute -top-2 -right-2 bg-yellow-400 text-[10px] px-2 py-0.5 rounded-full font-black text-black">
                     {PRICES.REVEAL_LETTER} 🪙
                   </div>
                 )}
@@ -166,15 +177,16 @@ const GameScreen: React.FC<Props> = ({ tour, roundIndex, onWin, onBack, coins, o
           })}
         </div>
 
-        <div className="flex flex-wrap justify-center gap-1 md:gap-3 px-2">
+        {/* Input Boxes */}
+        <div className="flex flex-wrap justify-center gap-2">
           {answerChars.map((char, i) => {
-            if (char === ' ') return <div key={i} className="w-5 md:w-10" />;
+            if (char === ' ') return <div key={i} className="w-4" />;
             const currentInput = inputs[inputCounter];
             inputCounter++;
             return (
               <div
                 key={i}
-                className={`w-8 h-10 md:w-14 md:h-18 border-b-4 flex items-center justify-center text-xl md:text-4xl font-black rounded-xl transition-all duration-300 shadow-lg ${currentInput ? 'border-white bg-white/20 text-white' : 'border-white/10 bg-black/20 text-white/10'
+                className={`w-10 h-12 md:w-14 md:h-18 border-b-4 flex items-center justify-center text-2xl md:text-4xl font-black rounded-xl transition-all ${currentInput ? 'border-white bg-white/20 text-white' : 'border-white/10 bg-black/20'
                   }`}
               >
                 {currentInput}
@@ -184,48 +196,50 @@ const GameScreen: React.FC<Props> = ({ tour, roundIndex, onWin, onBack, coins, o
         </div>
 
         {hintUsed && (
-          <div className="bg-white text-[#d000ff] px-6 py-2 rounded-2xl font-black shadow-2xl animate-bounce text-sm md:text-base border-2 border-indigo-100 mx-4 text-center">
+          <div className="bg-white text-purple-700 px-6 py-2 rounded-2xl font-black shadow-xl animate-bounce">
             💡 {round.hintText}
           </div>
         )}
       </div>
 
-      <div className="flex gap-3 mb-4">
+      {/* Action Buttons */}
+      <div className="flex gap-4 mb-6">
         <button
           onClick={() => onDeductCoins(PRICES.HINT) && setHintUsed(true)}
           disabled={hintUsed || coins < PRICES.HINT}
-          className="flex-1 py-3.5 bg-yellow-400 text-black rounded-2xl font-black text-xs md:text-sm shadow-xl border-b-4 border-yellow-700 active:translate-y-1 transition-all disabled:opacity-50"
+          className="flex-1 py-4 bg-yellow-400 text-black rounded-2xl font-black shadow-lg active:translate-y-1 transition-all disabled:opacity-50"
         >
-          {isKa ? `🔍 მინიშნება (-${PRICES.HINT})` : `🔍 Hint (-${PRICES.HINT})`}
+          {isKa ? '🔍 მინიშნება' : '🔍 Hint'}
         </button>
         <button
           onClick={() => onDeductCoins(PRICES.SKIP) && onWin(0)}
           disabled={coins < PRICES.SKIP}
-          className="flex-1 py-3.5 bg-white/15 text-white rounded-2xl font-black text-xs md:text-sm shadow-xl border-b-4 border-black/30 active:translate-y-1 transition-all disabled:opacity-50"
+          className="flex-1 py-4 bg-white/10 text-white rounded-2xl font-black shadow-lg active:translate-y-1 transition-all disabled:opacity-50"
         >
-          {isKa ? `⏭ გამოტოვება (-${PRICES.SKIP})` : `⏭ Skip (-${PRICES.SKIP})`}
+          {isKa ? '⏭ გამოტოვება' : '⏭ Skip'}
         </button>
       </div>
 
-      <div className="space-y-1 bg-black/30 p-2 md:p-5 rounded-[30px] shadow-2xl backdrop-blur-3xl border border-white/5">
+      {/* Keyboard */}
+      <div className="space-y-1.5 bg-black/20 p-3 rounded-[32px] backdrop-blur-xl border border-white/5">
         {isKa ? (
           <>
             <div className="flex justify-center gap-1">{["ქ", "წ", "ე", "რ", "ტ", "ყ", "უ", "ი", "ო", "პ"].map(renderKey)}</div>
-            <div className="flex justify-center gap-1 px-4 md:px-10">{["ა", "ს", "დ", "ფ", "გ", "ჰ", "ჯ", "კ", "ლ"].map(renderKey)}</div>
+            <div className="flex justify-center gap-1 px-4">{["ა", "ს", "დ", "ფ", "გ", "ჰ", "ჯ", "კ", "ლ"].map(renderKey)}</div>
             <div className="flex justify-center gap-1">
-              <button onClick={() => setIsShifted(!isShifted)} className={`w-12 md:w-16 h-9 md:h-11 rounded-lg flex items-center justify-center text-xl border-b-2 transition-all ${isShifted ? 'bg-white text-[#d000ff] border-white' : 'bg-white/10 text-white border-black/30'}`}>⇧</button>
+              <button onClick={() => setIsShifted(!isShifted)} className={`w-14 h-10 rounded-xl flex items-center justify-center font-bold border-b-2 ${isShifted ? 'bg-white text-purple-700' : 'bg-white/10 text-white border-black/20'}`}>⇧</button>
               {["ზ", "ხ", "ც", "ვ", "ბ", "ნ", "მ"].map(renderKey)}
-              <button onClick={handleBackspace} className="w-12 md:w-16 h-9 md:h-11 bg-white/10 text-white rounded-lg flex items-center justify-center text-xl border-b-2 border-black/30 active:scale-95 transition-all">⌫</button>
+              <button onClick={handleBackspace} className="w-14 h-10 bg-white/10 text-white rounded-xl flex items-center justify-center border-b-2 border-black/20">⌫</button>
             </div>
           </>
         ) : (
           <>
             <div className="flex justify-center gap-1">{["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"].map(renderKey)}</div>
-            <div className="flex justify-center gap-1 px-4 md:px-10">{["A", "S", "D", "F", "G", "H", "J", "K", "L"].map(renderKey)}</div>
+            <div className="flex justify-center gap-1 px-4">{["A", "S", "D", "F", "G", "H", "J", "K", "L"].map(renderKey)}</div>
             <div className="flex justify-center gap-1">
-              <div className="w-12 md:w-16" />
+              <div className="w-14" />
               {["Z", "X", "C", "V", "B", "N", "M"].map(renderKey)}
-              <button onClick={handleBackspace} className="w-12 md:w-16 h-9 md:h-11 bg-white/10 text-white rounded-lg flex items-center justify-center text-xl border-b-2 border-black/30 active:scale-95 transition-all">⌫</button>
+              <button onClick={handleBackspace} className="w-14 h-10 bg-white/10 text-white rounded-xl flex items-center justify-center border-b-2 border-black/20">⌫</button>
             </div>
           </>
         )}
