@@ -1,0 +1,69 @@
+
+import React from 'react';
+import { PlayerStats } from '../types';
+import { PRICES } from '../constants';
+
+interface Props {
+  stats: PlayerStats;
+  onBack: () => void;
+}
+
+const Shop: React.FC<Props> = ({ stats, onBack }) => {
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between mb-8 px-2">
+        <button onClick={onBack} className="p-3 bg-white/10 rounded-xl hover:bg-white/20 transition-colors">
+          ⬅
+        </button>
+        <h2 className="text-2xl font-bold">მაღაზია</h2>
+        <div className="bg-yellow-500/20 px-3 py-1 rounded-full border border-yellow-500/50 flex items-center gap-1">
+          <span className="text-yellow-400">🪙</span>
+          <span className="font-bold text-yellow-400 text-sm">{stats.coins}</span>
+        </div>
+      </div>
+
+      <div className="space-y-4 px-2">
+        <div className="p-6 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 rounded-3xl">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h3 className="text-xl font-bold text-yellow-400">VIP პაკეტი</h3>
+              <p className="text-sm text-yellow-200/60">მიიღეთ წვდომა ექსტრემალურ ტურებზე</p>
+            </div>
+            <div className="text-3xl">👑</div>
+          </div>
+          {stats.unlockedVip ? (
+            <div className="w-full py-3 bg-green-500/20 text-green-400 border border-green-500/50 rounded-xl text-center font-bold">
+              უკვე გააქტიურებულია ✅
+            </div>
+          ) : (
+            <button className="w-full py-3 bg-yellow-500 text-black rounded-xl font-bold hover:scale-105 transition-transform active:scale-95">
+              განბლოკვა 🪙 {PRICES.VIP_UNLOCK}
+            </button>
+          )}
+        </div>
+
+        <div className="p-6 glass rounded-3xl flex justify-between items-center opacity-50">
+          <div>
+            <h3 className="text-xl font-bold">ახალი თემები</h3>
+            <p className="text-sm">შეცვალე თამაშის ვიზუალი</p>
+          </div>
+          <div className="text-xs uppercase bg-white/10 px-2 py-1 rounded">მალე</div>
+        </div>
+
+        <div className="p-6 glass rounded-3xl flex justify-between items-center opacity-50">
+          <div>
+            <h3 className="text-xl font-bold">სპეციალური ემოჯები</h3>
+            <p className="text-sm">გახადე თამაში უფრო ფერადი</p>
+          </div>
+          <div className="text-xs uppercase bg-white/10 px-2 py-1 rounded">მალე</div>
+        </div>
+      </div>
+      
+      <div className="mt-auto text-center p-8 opacity-40 text-sm italic">
+        უფრო მეტი კონტენტი დაემატება შემდეგ განახლებაში!
+      </div>
+    </div>
+  );
+};
+
+export default Shop;
