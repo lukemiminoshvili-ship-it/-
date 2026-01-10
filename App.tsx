@@ -7,35 +7,53 @@ import GameScreen from './components/GameScreen';
 import WinScreen from './components/WinScreen';
 import Shop from './components/Shop';
 import IntroPopup from './components/IntroPopup';
+import { AuthScreen } from './components/AuthScreen'; // ახალი კომპონენტი
+import { auth, db } from './firebase'; // გამოძახება firebase.ts-დან
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const App: React.FC = () => {
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [gameState, setGameState] = useState<GameState>(GameState.HOME);
-  const [stats, setStats] = useState<PlayerStats>(() => {
-    const saved = localStorage.getItem('emoji_words_stats');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error("Error parsing stats:", e);
-      }
-    }
-    return {
-      coins: 200,
-      completedRounds: 0,
-      completedTours: [],
-      unlockedVip: false,
-      language: 'ka',
-      hasSeenIntro: false
-    };
+
+  const [stats, setStats] = useState<PlayerStats>({
+    coins: 200,
+    completedRounds: 0,
+    completedTours: [],
+    unlockedVip: false,
+    language: 'ka',
+    hasSeenIntro: false
   });
 
   const [currentTour, setCurrentTour] = useState<Tour | null>(null);
   const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
   const [lastReward, setLastReward] = useState(0);
 
+  // 1. ავტორიზაციის სტატუსის კონტროლი
   useEffect(() => {
-    localStorage.setItem('emoji_words_stats', JSON.stringify(stats));
-  }, [stats]);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        setUser(firebaseUser);
+        // ბაზიდან მონაცემების წამოღება
+        const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+        if (userDoc.exists()) {
+          setStats(userDoc.data() as PlayerStats);
+        }
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 2. პროგრესის ავტომატური სინქრონიზაცია Firebase-თან
+  useEffect(() => {
+    if (user && !loading) {
+      setDoc(doc(db, "users", user.uid), stats, { merge: true });
+    }
+  }, [stats, user, loading]);
 
   const tours = useMemo(() => {
     const generated = generateTours(stats.language);
@@ -100,9 +118,30 @@ const App: React.FC = () => {
     }));
   };
 
+  if (loading) return <div className="min-h-screen bg-[#d000ff] flex items-center justify-center text-white">იტვირთება...</div>;
+
+  // თუ მომხმარებელი არ არის შესული, ვაჩვენებთ ავტორიზაციის ეკრანს
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#d000ff] flex items-center justify-center">
+        <AuthScreen onAuthSuccess={(data) => {
+          if (data) setStats(data);
+          // user-ს ავტომატურად დააყენებს useEffect-ში onAuthStateChanged
+        }} />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#d000ff] text-white overflow-hidden flex flex-col items-center">
       <div className="w-full h-screen flex flex-col relative">
+        <button
+          onClick={() => auth.signOut()}
+          className="absolute top-2 right-2 z-50 bg-red-500 text-xs p-1 rounded"
+        >
+          გამოსვლა
+        </button>
+
         {!stats.hasSeenIntro && (
           <IntroPopup lang={stats.language as any} onStart={() => setStats(p => ({ ...p, hasSeenIntro: true }))} />
         )}
