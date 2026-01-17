@@ -30,50 +30,49 @@ const App: React.FC = () => {
   const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
   const [lastReward, setLastReward] = useState(0);
 
-  // 1. ავტორიზაციის და მონაცემების ჩატვირთვა
+  // --- 1. ჩატვირთვის სწორი ლოგიკა ---
   useEffect(() => {
-    console.log("App: პროცესი დაიწყო...");
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      try {
-        if (firebaseUser) {
-          console.log("App: მომხმარებელი შესულია:", firebaseUser.uid);
-          setUser(firebaseUser);
+      setLoading(true); // ვიწყებთ ჩატვირთვას ყოველ ცვლილებაზე
 
+      if (firebaseUser) {
+        setUser(firebaseUser);
+        try {
           const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
           if (userDoc.exists()) {
-            console.log("App: მონაცემები ნაპოვნია Firestore-ში");
             setStats(userDoc.data() as PlayerStats);
           } else {
-            console.log("App: მომხმარებელი ახალია, მონაცემები არ არის");
+            // თუ ახალი იუზერია, ბაზაში ვქმნით მის ჩანაწერს საწყისი სტატისტიკით
+            await setDoc(doc(db, "users", firebaseUser.uid), stats);
           }
-        } else {
-          console.log("App: მომხმარებელი არ არის ავტორიზებული");
-          setUser(null);
+        } catch (error) {
+          console.error("მონაცემების წაკითხვის შეცდომა:", error);
         }
-      } catch (error) {
-        console.error("App: მონაცემების წაკითხვის შეცდომა:", error);
-      } finally {
-        setLoading(false); // ლოდინი სრულდება ნებისმიერ შემთხვევაში
+      } else {
+        setUser(null);
       }
+
+      setLoading(false); // ჩატვირთვა დასრულდა (წარმატებით თუ შეცდომით)
     });
 
     return () => unsubscribe();
   }, []);
 
-  // 2. პროგრესის შენახვა Firestore-ში
+  // --- 2. მონაცემების შენახვა ცვლილებისას ---
   useEffect(() => {
-    const syncData = async () => {
-      if (user && !loading) {
+    if (user && !loading) {
+      const saveData = async () => {
         try {
           await setDoc(doc(db, "users", user.uid), stats, { merge: true });
-        } catch (error) {
-          console.error("App: მონაცემების შენახვის შეცდომა:", error);
+        } catch (e) {
+          console.error("შენახვის შეცდომა:", e);
         }
-      }
-    };
-    syncData();
+      };
+      saveData();
+    }
   }, [stats, user, loading]);
 
+  // --- დამხმარე ფუნქციები (Language & Tours) ---
   const tours = useMemo(() => {
     const generated = generateTours(stats.language);
     return Array.isArray(generated) ? generated : [];
@@ -133,27 +132,22 @@ const App: React.FC = () => {
     setStats(prev => ({
       ...prev,
       language: prev.language === 'ka' ? 'en' : 'ka',
-      completedTours: []
+      completedTours: [] // ენის შეცვლისას ვასუფთავებთ პროგრესს ამ ენისთვის
     }));
   };
 
+  // --- ეკრანების ჩვენება ---
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#d000ff] flex flex-col items-center justify-center text-white">
-        <div className="mb-4">იტვირთება...</div>
-        <button
-          onClick={() => setLoading(false)}
-          className="text-xs opacity-50 underline"
-        >
-          იძულებით ჩართვა
-        </button>
+      <div className="min-h-screen bg-[#d000ff] flex items-center justify-center text-white font-bold">
+        იტვირთება...
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#d000ff] flex items-center justify-center">
+      <div className="min-h-screen bg-[#d000ff] flex items-center justify-center p-4">
         <AuthScreen onAuthSuccess={(data) => {
           if (data) setStats(data);
         }} />
@@ -163,10 +157,10 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#d000ff] text-white overflow-hidden flex flex-col items-center">
-      <div className="w-full h-screen flex flex-col relative">
+      <div className="w-full max-w-md h-screen flex flex-col relative">
         <button
           onClick={() => auth.signOut()}
-          className="absolute top-2 right-2 z-50 bg-red-500 hover:bg-red-600 text-[10px] px-2 py-1 rounded"
+          className="absolute top-4 right-4 z-50 bg-red-500/80 hover:bg-red-600 text-[10px] px-2 py-1 rounded-full shadow-lg"
         >
           გამოსვლა
         </button>
