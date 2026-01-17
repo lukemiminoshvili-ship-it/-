@@ -7,8 +7,8 @@ import GameScreen from './components/GameScreen';
 import WinScreen from './components/WinScreen';
 import Shop from './components/Shop';
 import IntroPopup from './components/IntroPopup';
-import { AuthScreen } from './components/AuthScreen'; // ახალი კომპონენტი
-import { auth, db } from './firebase'; // გამოძახება firebase.ts-დან
+import { AuthScreen } from './components/AuthScreen';
+import { auth, db } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
@@ -30,29 +30,48 @@ const App: React.FC = () => {
   const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
   const [lastReward, setLastReward] = useState(0);
 
-  // 1. ავტორიზაციის სტატუსის კონტროლი
+  // 1. ავტორიზაციის და მონაცემების ჩატვირთვა
   useEffect(() => {
+    console.log("App: პროცესი დაიწყო...");
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser);
-        // ბაზიდან მონაცემების წამოღება
-        const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-        if (userDoc.exists()) {
-          setStats(userDoc.data() as PlayerStats);
+      try {
+        if (firebaseUser) {
+          console.log("App: მომხმარებელი შესულია:", firebaseUser.uid);
+          setUser(firebaseUser);
+
+          const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+          if (userDoc.exists()) {
+            console.log("App: მონაცემები ნაპოვნია Firestore-ში");
+            setStats(userDoc.data() as PlayerStats);
+          } else {
+            console.log("App: მომხმარებელი ახალია, მონაცემები არ არის");
+          }
+        } else {
+          console.log("App: მომხმარებელი არ არის ავტორიზებული");
+          setUser(null);
         }
-      } else {
-        setUser(null);
+      } catch (error) {
+        console.error("App: მონაცემების წაკითხვის შეცდომა:", error);
+      } finally {
+        setLoading(false); // ლოდინი სრულდება ნებისმიერ შემთხვევაში
       }
-      setLoading(false);
     });
+
     return () => unsubscribe();
   }, []);
 
-  // 2. პროგრესის ავტომატური სინქრონიზაცია Firebase-თან
+  // 2. პროგრესის შენახვა Firestore-ში
   useEffect(() => {
-    if (user && !loading) {
-      setDoc(doc(db, "users", user.uid), stats, { merge: true });
-    }
+    const syncData = async () => {
+      if (user && !loading) {
+        try {
+          await setDoc(doc(db, "users", user.uid), stats, { merge: true });
+        } catch (error) {
+          console.error("App: მონაცემების შენახვის შეცდომა:", error);
+        }
+      }
+    };
+    syncData();
   }, [stats, user, loading]);
 
   const tours = useMemo(() => {
@@ -118,15 +137,25 @@ const App: React.FC = () => {
     }));
   };
 
-  if (loading) return <div className="min-h-screen bg-[#d000ff] flex items-center justify-center text-white">იტვირთება...</div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#d000ff] flex flex-col items-center justify-center text-white">
+        <div className="mb-4">იტვირთება...</div>
+        <button
+          onClick={() => setLoading(false)}
+          className="text-xs opacity-50 underline"
+        >
+          იძულებით ჩართვა
+        </button>
+      </div>
+    );
+  }
 
-  // თუ მომხმარებელი არ არის შესული, ვაჩვენებთ ავტორიზაციის ეკრანს
   if (!user) {
     return (
       <div className="min-h-screen bg-[#d000ff] flex items-center justify-center">
         <AuthScreen onAuthSuccess={(data) => {
           if (data) setStats(data);
-          // user-ს ავტომატურად დააყენებს useEffect-ში onAuthStateChanged
         }} />
       </div>
     );
@@ -137,7 +166,7 @@ const App: React.FC = () => {
       <div className="w-full h-screen flex flex-col relative">
         <button
           onClick={() => auth.signOut()}
-          className="absolute top-2 right-2 z-50 bg-red-500 text-xs p-1 rounded"
+          className="absolute top-2 right-2 z-50 bg-red-500 hover:bg-red-600 text-[10px] px-2 py-1 rounded"
         >
           გამოსვლა
         </button>
